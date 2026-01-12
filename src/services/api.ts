@@ -1,16 +1,18 @@
 // ============================================
 // api.ts - Complete API service with all method aliases
-// Backend: localhost:5000 (via Vite proxy)
-// Bridge: localhost:3000 (direct connection)
+// Backend: Cloud hosted at timesyncprobackend.onrender.com
+// Bridge: localhost:3000 (direct connection for ZKTeco terminals)
+// Fingerprint: localhost:8080 (local USB fingerprint service)
 // ============================================
 
 import axios from 'axios';
+import { getBackendUrl, BRIDGE_URL as CONFIG_BRIDGE_URL } from '../config/environment';
 
-// Backend API - relative URL (Vite proxy routes to localhost:5000)
-const BACKEND_URL = '/api';
+// Backend API - Cloud hosted backend
+const BACKEND_URL = `${getBackendUrl()}/api`;
 
 // Bridge API - direct connection for terminal operations
-const BRIDGE_URL = 'http://localhost:3000';
+const BRIDGE_URL = CONFIG_BRIDGE_URL;
 
 // Backend API instance
 const backendApi = axios.create({

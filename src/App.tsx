@@ -27,6 +27,7 @@ import LeavesPage from './pages/LeavesPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import TimeStationKiosk from './pages/TimeStationKiosk';
+import KioskSetup from './pages/KioskSetup';
 import EmployeeRatesPage from './pages/EmployeeRatesPage';
 import InfractionsPage from './pages/InfractionsPage';
 import PayrollDeductionsPage from './pages/PayrollDeductionsPage';
@@ -259,6 +260,10 @@ const App: React.FC = () => {
                   <Route
                     path="/kiosk"
                     element={<TimeStationKiosk />}
+                  />
+                  <Route
+                    path="/kiosk-setup"
+                    element={<KioskSetup />}
                   />
 
                   {/* Protected Routes */}

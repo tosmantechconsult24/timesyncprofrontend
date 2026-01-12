@@ -6,7 +6,10 @@
 // Communicates with Python USB service on port 8080
 // ============================================
 
-const FINGERPRINT_SERVICE_URL = 'http://localhost:8080';
+import { getFingerprintServiceUrl } from '../config/environment';
+
+// Get the fingerprint service URL from config (supports kiosk config override)
+const getServiceUrl = () => getFingerprintServiceUrl();
 
 export interface FingerprintService {
   isConnected: boolean;
@@ -22,7 +25,7 @@ const createFingerprintService = (): FingerprintService => {
 
   const checkConnection = async (): Promise<boolean> => {
     try {
-      const response = await fetch(`${FINGERPRINT_SERVICE_URL}/health`, {
+      const response = await fetch(`${getServiceUrl()}/health`, {
         method: 'GET',
       });
       
@@ -59,7 +62,7 @@ const createFingerprintService = (): FingerprintService => {
       console.log('[FingerprintService] Starting capture...');
       
       try {
-        const response = await fetch(`${FINGERPRINT_SERVICE_URL}/capture`, {
+        const response = await fetch(`${getServiceUrl()}/capture`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
@@ -89,7 +92,7 @@ const createFingerprintService = (): FingerprintService => {
       console.log('[FingerprintService] Verifying fingerprint...');
       
       try {
-        const response = await fetch(`${FINGERPRINT_SERVICE_URL}/match`, {
+        const response = await fetch(`${getServiceUrl()}/match`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -124,7 +127,7 @@ const createFingerprintService = (): FingerprintService => {
       console.log('[FingerprintService] Enrolling user:', userId);
       
       try {
-        const response = await fetch(`${FINGERPRINT_SERVICE_URL}/enroll`, {
+        const response = await fetch(`${getServiceUrl()}/enroll`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, templates }),

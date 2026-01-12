@@ -1,6 +1,7 @@
 // ============================================
 // USBFingerprintScanner.tsx
 // Settings page component for managing USB scanner
+// Uses centralized environment configuration
 // ============================================
 
 import React, { useState, useEffect } from 'react';
@@ -40,8 +41,9 @@ import {
   Person as PersonIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
+import { getFingerprintServiceUrl } from '../config/environment';
 
-const FINGERPRINT_SERVICE_URL = 'http://localhost:8080';
+const FINGERPRINT_SERVICE_URL = getFingerprintServiceUrl();
 
 interface ScannerStatus {
   status: string;

@@ -1,6 +1,6 @@
 // ============================================
 // TimeStationKiosk.tsx - Complete Kiosk Interface
-// FIXED: Uses port 5000 for backend API
+// Uses centralized environment configuration
 // ============================================
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -38,13 +38,16 @@ import {
   AccessTime as TimeIcon,
   Close as CloseIcon,
   Refresh as RefreshIcon,
+  Keyboard as KeyboardIcon,
 } from '@mui/icons-material';
+import { getBackendUrl, getFingerprintServiceUrl } from '../config/environment';
+import OnScreenKeyboard from '../components/OnScreenKeyboard';
 
 // ============================================
-// CONFIGURATION - UPDATE THESE IF NEEDED
+// CONFIGURATION - Uses centralized environment
 // ============================================
-const FINGERPRINT_SERVICE_URL = 'http://localhost:8080';
-const API_BASE_URL = 'http://localhost:5001/api';
+const FINGERPRINT_SERVICE_URL = getFingerprintServiceUrl();
+const API_BASE_URL = `${getBackendUrl()}/api`;
 
 // ============================================
 // TYPES
@@ -78,6 +81,11 @@ const LEAVE_TYPES = [
 ];
 
 // ============================================
+// AUTO CLOCK-OUT INTERVAL (runs every minute)
+// ============================================
+const AUTO_CLOCKOUT_INTERVAL = 60 * 1000; // 1 minute
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 const TimeStationKiosk: React.FC = () => {
@@ -93,6 +101,9 @@ const TimeStationKiosk: React.FC = () => {
   const [clockOutDialogOpen, setClockOutDialogOpen] = useState(false);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false);
+
+  // On-screen keyboard state
+  const [showKeyboard, setShowKeyboard] = useState(false);
 
   // Employee lookup
   const [employeeId, setEmployeeId] = useState('');
@@ -161,6 +172,37 @@ const TimeStationKiosk: React.FC = () => {
     const interval = setInterval(checkScannerConnection, 5000);
     return () => clearInterval(interval);
   }, [checkScannerConnection]);
+
+  // Auto clock-out scheduler - runs every minute
+  // Calls backend API to auto clock-out employees 10min after shift end
+  useEffect(() => {
+    const runAutoClockout = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/time-entries/auto-clockout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.clockedOutCount > 0) {
+            console.log(`[Kiosk] Auto clock-out: ${data.clockedOutCount} employees clocked out`);
+            showSnackbar(`Auto clock-out: ${data.clockedOutCount} employee(s) clocked out`, 'success');
+          }
+        }
+      } catch (error) {
+        console.error('[Kiosk] Auto clock-out error:', error);
+      }
+    };
+
+    // Run immediately on mount
+    runAutoClockout();
+    
+    // Then run every minute
+    const autoClockoutInterval = setInterval(runAutoClockout, AUTO_CLOCKOUT_INTERVAL);
+    
+    return () => clearInterval(autoClockoutInterval);
+  }, []);
 
   // ============================================
   // HELPERS
@@ -510,6 +552,7 @@ const TimeStationKiosk: React.FC = () => {
     setScanResult(null);
     setScanMessage('');
     setScanning(false);
+    setShowKeyboard(false);
     setLeaveType('');
     setLeaveStartDate('');
     setLeaveEndDate('');
@@ -531,44 +574,76 @@ const TimeStationKiosk: React.FC = () => {
   };
 
   // ============================================
+  // HANDLE EMPLOYEE ID INPUT WITH KEYBOARD
+  // ============================================
+  
+  const handleEmployeeIdSubmit = () => {
+    setShowKeyboard(false);
+    lookupEmployee(employeeId);
+  };
+
+  // ============================================
   // RENDER EMPLOYEE LOOKUP STEP
   // ============================================
   
-  const renderEmployeeLookup = () => (
+  const renderEmployeeLookup = (action?: 'clock_in' | 'clock_out') => (
     <Box sx={{ py: 2 }}>
       <Typography variant="body1" color="white" gutterBottom>
         Enter your Employee ID:
       </Typography>
-      <TextField
-        fullWidth
-        value={employeeId}
-        onChange={(e) => setEmployeeId(e.target.value)}
-        placeholder="e.g., 1001"
-        variant="outlined"
-        sx={{ 
-          mb: 2, 
-          '& .MuiOutlinedInput-root': { 
+      <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+        <TextField
+          fullWidth
+          value={employeeId}
+          onChange={(e) => setEmployeeId(e.target.value)}
+          placeholder="e.g., 1001"
+          variant="outlined"
+          sx={{ 
+            '& .MuiOutlinedInput-root': { 
+              color: 'white', 
+              bgcolor: 'rgba(255,255,255,0.1)',
+              '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+              '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+            } 
+          }}
+          onKeyPress={(e) => e.key === 'Enter' && handleEmployeeIdSubmit()}
+          onFocus={() => setShowKeyboard(true)}
+          inputProps={{ readOnly: showKeyboard }}
+        />
+        <IconButton 
+          onClick={() => setShowKeyboard(!showKeyboard)}
+          sx={{ 
             color: 'white', 
-            bgcolor: 'rgba(255,255,255,0.1)',
-            '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
-            '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
-          } 
-        }}
-        onKeyPress={(e) => e.key === 'Enter' && lookupEmployee(employeeId)}
-        autoFocus
-      />
+            bgcolor: showKeyboard ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255,255,255,0.1)',
+            '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+          }}
+        >
+          <KeyboardIcon />
+        </IconButton>
+      </Box>
       {lookupError && (
         <Alert severity="error" sx={{ mb: 2 }}>{lookupError}</Alert>
       )}
       <Button
         fullWidth
         variant="contained"
-        onClick={() => lookupEmployee(employeeId)}
+        onClick={handleEmployeeIdSubmit}
         disabled={!employeeId || lookupLoading}
         sx={{ py: 1.5 }}
       >
         {lookupLoading ? <CircularProgress size={24} /> : 'Continue'}
       </Button>
+      
+      {/* On-Screen Keyboard */}
+      {showKeyboard && (
+        <OnScreenKeyboard
+          value={employeeId}
+          onChange={setEmployeeId}
+          onEnter={handleEmployeeIdSubmit}
+          onClose={() => setShowKeyboard(false)}
+          title="Enter Employee ID"
+        />
+      )}
     </Box>
   );
 
@@ -603,119 +678,144 @@ const TimeStationKiosk: React.FC = () => {
   // RENDER FINGERPRINT SCAN
   // ============================================
   
-  const renderFingerprintScan = (action: 'clock_in' | 'clock_out') => (
-    <Box sx={{ py: 2 }}>
-      {/* Employee Info */}
-      <Paper sx={{ p: 2, mb: 3, bgcolor: 'rgba(255,255,255,0.1)' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Avatar 
-            src={employee?.photo} 
-            sx={{ 
-              width: 60, 
-              height: 60, 
-              bgcolor: action === 'clock_in' ? '#22c55e' : '#ef4444' 
-            }}
-          >
-            {employee?.firstName?.[0]}{employee?.lastName?.[0]}
-          </Avatar>
-          <Box>
-            <Typography variant="h6" color="white">
-              {employee?.firstName} {employee?.lastName}
-            </Typography>
-            <Typography variant="body2" color="rgba(255,255,255,0.7)">
-              {employee?.department?.name || 'No Department'}
-            </Typography>
-            {!employee?.fingerprintEnrolled && (
-              <Chip 
-                label="Fingerprint Not Enrolled" 
-                size="small" 
-                color="warning" 
-                sx={{ mt: 0.5 }}
-              />
-            )}
-          </Box>
-        </Box>
-      </Paper>
-
-      {/* Shift Info */}
-      {employee?.shift && (
+  const renderFingerprintScan = (action: 'clock_in' | 'clock_out') => {
+    // Check if employee has no shift assigned (for clock-in only)
+    const hasNoShift = !employee?.shift;
+    const cannotClockIn = action === 'clock_in' && hasNoShift;
+    
+    return (
+      <Box sx={{ py: 2 }}>
+        {/* Employee Info */}
         <Paper sx={{ p: 2, mb: 3, bgcolor: 'rgba(255,255,255,0.1)' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-            <TimeIcon sx={{ color: '#f59e0b' }} />
-            <Typography variant="subtitle1" color="white">Today's Shift</Typography>
-          </Box>
-          <Typography variant="h5" color="#4ade80">
-            {employee.shift.name}
-          </Typography>
-          <Typography variant="body1" color="rgba(255,255,255,0.7)">
-            {employee.shift.startTime} - {employee.shift.endTime}
-          </Typography>
-        </Paper>
-      )}
-
-      {/* Fingerprint Scan */}
-      <Box sx={{ textAlign: 'center' }}>
-        {scanning ? (
-          <Box>
-            <Box sx={{ position: 'relative', display: 'inline-flex', mb: 2 }}>
-              <CircularProgress size={80} sx={{ color: action === 'clock_in' ? '#22c55e' : '#ef4444' }} />
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  bottom: 0,
-                  right: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <FingerprintIcon sx={{ fontSize: 40, color: 'white' }} />
-              </Box>
-            </Box>
-            <Typography color="white">{scanMessage}</Typography>
-            <LinearProgress 
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Avatar 
+              src={employee?.photo} 
               sx={{ 
-                mt: 2, 
-                maxWidth: 300, 
-                mx: 'auto',
-                '& .MuiLinearProgress-bar': {
-                  bgcolor: action === 'clock_in' ? '#22c55e' : '#ef4444'
-                }
-              }} 
-            />
+                width: 60, 
+                height: 60, 
+                bgcolor: action === 'clock_in' ? '#22c55e' : '#ef4444' 
+              }}
+            >
+              {employee?.firstName?.[0]}{employee?.lastName?.[0]}
+            </Avatar>
+            <Box>
+              <Typography variant="h6" color="white">
+                {employee?.firstName} {employee?.lastName}
+              </Typography>
+              <Typography variant="body2" color="rgba(255,255,255,0.7)">
+                {employee?.department?.name || 'No Department'}
+              </Typography>
+              {!employee?.fingerprintEnrolled && (
+                <Chip 
+                  label="Fingerprint Not Enrolled" 
+                  size="small" 
+                  color="warning" 
+                  sx={{ mt: 0.5 }}
+                />
+              )}
+              {hasNoShift && (
+                <Chip 
+                  label="No Shift Assigned" 
+                  size="small" 
+                  color="error" 
+                  sx={{ mt: 0.5, ml: employee?.fingerprintEnrolled ? 0 : 1 }}
+                />
+              )}
+            </Box>
           </Box>
-        ) : (
-          <Button
-            variant="contained"
-            size="large"
-            onClick={() => handleFingerprintScan(action)}
-            disabled={!employee?.fingerprintEnrolled}
-            sx={{
-              py: 3,
-              px: 6,
-              fontSize: '1.2rem',
-              background: action === 'clock_in' 
-                ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
-                : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-            }}
-            startIcon={<FingerprintIcon sx={{ fontSize: 32 }} />}
-          >
-            {employee?.fingerprintEnrolled 
-              ? `Scan to ${action === 'clock_in' ? 'Clock In' : 'Clock Out'}`
-              : 'Fingerprint Not Enrolled'}
-          </Button>
-        )}
-        
-        {!employee?.fingerprintEnrolled && (
-          <Alert severity="warning" sx={{ mt: 2, textAlign: 'left' }}>
-            Your fingerprint is not enrolled. Please contact admin to register your fingerprint.
+        </Paper>
+
+        {/* Shift Info or No Shift Warning */}
+        {employee?.shift ? (
+          <Paper sx={{ p: 2, mb: 3, bgcolor: 'rgba(255,255,255,0.1)' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <TimeIcon sx={{ color: '#f59e0b' }} />
+              <Typography variant="subtitle1" color="white">Today's Shift</Typography>
+            </Box>
+            <Typography variant="h5" color="#4ade80">
+              {employee.shift.name}
+            </Typography>
+            <Typography variant="body1" color="rgba(255,255,255,0.7)">
+              {employee.shift.startTime} - {employee.shift.endTime}
+            </Typography>
+          </Paper>
+        ) : action === 'clock_in' ? (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+              Cannot Clock In - No Shift Assigned
+            </Typography>
+            <Typography variant="body2">
+              You do not have an assigned shift. Please contact your supervisor or HR to get a shift assigned before clocking in.
+            </Typography>
           </Alert>
-        )}
+        ) : null}
+
+        {/* Fingerprint Scan */}
+        <Box sx={{ textAlign: 'center' }}>
+          {scanning ? (
+            <Box>
+              <Box sx={{ position: 'relative', display: 'inline-flex', mb: 2 }}>
+                <CircularProgress size={80} sx={{ color: action === 'clock_in' ? '#22c55e' : '#ef4444' }} />
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    right: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <FingerprintIcon sx={{ fontSize: 40, color: 'white' }} />
+                </Box>
+              </Box>
+              <Typography color="white">{scanMessage}</Typography>
+              <LinearProgress 
+                sx={{ 
+                  mt: 2, 
+                  maxWidth: 300, 
+                  mx: 'auto',
+                  '& .MuiLinearProgress-bar': {
+                    bgcolor: action === 'clock_in' ? '#22c55e' : '#ef4444'
+                  }
+                }} 
+              />
+            </Box>
+          ) : (
+            <Button
+              variant="contained"
+              size="large"
+              onClick={() => handleFingerprintScan(action)}
+              disabled={!employee?.fingerprintEnrolled || cannotClockIn}
+              sx={{
+                py: 3,
+                px: 6,
+                fontSize: '1.2rem',
+                background: action === 'clock_in' 
+                  ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+                  : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              }}
+              startIcon={<FingerprintIcon sx={{ fontSize: 32 }} />}
+            >
+              {cannotClockIn 
+                ? 'No Shift Assigned'
+                : !employee?.fingerprintEnrolled 
+                  ? 'Fingerprint Not Enrolled'
+                  : `Scan to ${action === 'clock_in' ? 'Clock In' : 'Clock Out'}`}
+            </Button>
+          )}
+          
+          {!employee?.fingerprintEnrolled && (
+            <Alert severity="warning" sx={{ mt: 2, textAlign: 'left' }}>
+              Your fingerprint is not enrolled. Please contact admin to register your fingerprint.
+            </Alert>
+          )}
+        </Box>
       </Box>
-    </Box>
-  );
+    );
+  };
 
   // ============================================
   // MAIN RENDER

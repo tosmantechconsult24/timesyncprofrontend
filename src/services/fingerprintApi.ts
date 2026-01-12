@@ -4,7 +4,10 @@
 // Communicates with Python fingerprint service
 // ============================================
 
-const FINGERPRINT_SERVICE_URL = 'http://localhost:8080';
+import { getFingerprintServiceUrl } from '../config/environment';
+
+// Get the fingerprint service URL dynamically
+const getServiceUrl = () => getFingerprintServiceUrl();
 
 export interface CaptureResult {
   success: boolean;
@@ -50,10 +53,16 @@ export interface ServiceStatus {
 }
 
 class FingerprintApi {
-  private baseUrl: string;
+  private getBaseUrl(): string {
+    return getServiceUrl();
+  }
 
-  constructor(baseUrl: string = FINGERPRINT_SERVICE_URL) {
-    this.baseUrl = baseUrl;
+  constructor() {
+    // URL is now resolved dynamically from config
+  }
+
+  private get baseUrl(): string {
+    return this.getBaseUrl();
   }
 
   /**

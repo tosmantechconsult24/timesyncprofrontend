@@ -1,6 +1,6 @@
 // ============================================
 // FingerprintEnrollmentDialog.tsx
-// Fixed to use port 5000 for backend
+// Uses centralized environment configuration
 // ============================================
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -29,12 +29,13 @@ import {
   Replay as RetryIcon,
   TouchApp as TouchAppIcon,
 } from '@mui/icons-material';
+import { getBackendUrl, getFingerprintServiceUrl } from '../config/environment';
 
 // ============================================
-// CONFIGURATION - UPDATE THESE IF NEEDED
+// CONFIGURATION - Uses centralized environment
 // ============================================
-const FINGERPRINT_SERVICE_URL = 'http://localhost:8080';
-const API_BASE_URL = 'http://localhost:5001/api';
+const FINGERPRINT_SERVICE_URL = getFingerprintServiceUrl();
+const API_BASE_URL = `${getBackendUrl()}/api`;
 const CAPTURE_TIMEOUT = 15000; // 15 seconds timeout per capture
 
 // ============================================
